@@ -1,4 +1,5 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { inviteJoinPath } from "@/lib/inviteLink";
 
 /** Backwards-compatible deep link for QR scanners and external invite links. */
 export default function InviteTokenPage({
@@ -6,5 +7,7 @@ export default function InviteTokenPage({
 }: {
   params: { token: string };
 }) {
-  redirect(`/join/${encodeURIComponent(params.token)}`);
+  const path = inviteJoinPath(params.token);
+  if (!path) notFound();
+  redirect(path);
 }
