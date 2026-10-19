@@ -6,19 +6,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { NetAmount, Money } from "@/components/amount";
+import { FiatEquivalent } from "@/components/FiatEquivalent";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ListSkeleton } from "@/components/ui/skeleton";
-import {
-  SettleDialog,
-  suggestionToTarget,
-  type SettleTarget,
-} from "@/components/settle/settle-dialog";
+import { SettlementModal } from "@/components/settlements/SettlementModal";
+import type { SettleTarget } from "@/lib/useSettlementFlow";
 import { SectionError, SectionLoading } from "@/components/ui/section";
 import { useBalances } from "@/lib/queries";
 import { resolveSectionStatus } from "@/lib/sectionState";
 import { amountToStroops } from "@/lib/currency";
 import { useWalletDisconnected } from "@/lib/wallet-store";
 import { simplifyDebts } from "@/lib/settlementUtils";
+
+import { AssetSwitcher } from "@/components/AssetSwitcher";
+import { useAssetStore } from "@/lib/asset-store";
+import { MultiCurrencyBalanceSummary } from "@/components/groups/MultiCurrencyBalanceSummary";
 
 export function BalancesPanel({
   groupId,
@@ -28,7 +30,9 @@ export function BalancesPanel({
   currentUserId: string;
 }) {
   const { data, isLoading, isError, error, refetch } = useBalances(groupId);
+  const { activeAsset } = useAssetStore();
   const [target, setTarget] = useState<SettleTarget | null>(null);
+
   // Settling requires a wallet signature — lock the action while the
   // wallet is disconnected.
   const walletDisconnected = useWalletDisconnected();
@@ -69,6 +73,13 @@ export function BalancesPanel({
 
   return (
     <div className="space-y-6">
+      <AssetSwitcher />
+
+      <MultiCurrencyBalanceSummary
+        balances={balances}
+        userId={currentUserId}
+      />
+
       <div>
         <h3 className="mb-3 font-display text-sm uppercase tracking-widest text-ink/60">
           Net balances
@@ -82,7 +93,13 @@ export function BalancesPanel({
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {balances.map((b) => (
-              <Card key={b.userId} className="flex items-center justify-between p-3">
+              <Card
+                key={b.userId}
+                className="flex items-center justify-between p-3"
+                data-testid="balance-row"
+                data-user-id={b.userId}
+                data-net={b.net}
+              >
                 <span className="flex items-center gap-2">
                   <Avatar user={b.user} size="sm" />
                   <span className="text-sm font-bold">
@@ -92,7 +109,10 @@ export function BalancesPanel({
                     )}
                   </span>
                 </span>
-                <NetAmount value={b.net} assetCode={b.assetCode} />
+                <div className="flex items-center gap-2">
+                  <NetAmount value={b.net} assetCode={b.assetCode} />
+                  <FiatEquivalent amount={b.net} assetCode={b.assetCode} />
+                </div>
               </Card>
             ))}
           </div>
@@ -114,7 +134,11 @@ export function BalancesPanel({
             {simplified.map((s, i) => {
               const youPay = s.fromUserId === currentUserId;
               return (
-                <Card key={i}>
+                <Card
+                  key={i}
+                  data-testid="settlement-path"
+                  data-from-user-id={s.fromUserId}
+                >
                   <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div className="flex items-center gap-2">
                       <Avatar user={s.from} size="sm" />
@@ -127,6 +151,7 @@ export function BalancesPanel({
                     </div>
                     <div className="flex items-center gap-3">
                       <Money value={s.amount} assetCode={s.assetCode} />
+                      <FiatEquivalent amount={s.amount} assetCode={s.assetCode} />
                       {youPay && (
                         <Button
                           size="sm"
@@ -150,7 +175,7 @@ export function BalancesPanel({
         )}
       </div>
 
-      <SettleDialog
+      <SettlementModal
         open={!!target}
         onClose={() => setTarget(null)}
         groupId={groupId}
