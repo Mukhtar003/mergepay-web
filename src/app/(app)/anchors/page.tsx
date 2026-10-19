@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowUpFromLine,
   Banknote,
   ExternalLink,
@@ -21,11 +22,15 @@ import { handleApiError } from "@/lib/errorHandler";
 import { signXdr, WalletError, NotInstalledMessage } from "@/lib/stellar";
 import { Timestamp } from "@/components/timestamp";
 import type { AnchorSessionKind } from "@/lib/types";
+import { AnchorInteractiveModal } from "@/components/AnchorInteractiveModal";
+import { Sep24Modal } from "@/components/anchors/Sep24Modal";
 
 export default function AnchorsPage() {
   const anchors = useAnchors();
   const sessions = useAnchorSessions();
   const [busy, setBusy] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [newTransferOpen, setNewTransferOpen] = useState(false);
 
   async function startFlow(
     kind: AnchorSessionKind,
@@ -54,8 +59,8 @@ export default function AnchorsPage() {
 
       sessions.refetch();
       if (session.interactiveUrl) {
-        window.open(session.interactiveUrl, "_blank", "noopener,noreferrer");
-        toast.success("Anchor flow opened in a new tab");
+        setActiveSessionId(session.id);
+        toast.success("Complete the transfer in the secure anchor window");
       } else {
         toast.success("Anchor session started");
       }
@@ -76,6 +81,11 @@ export default function AnchorsPage() {
       <PageHeader
         title="Anchors"
         description="Move between fiat and Stellar assets through SEP-24 anchors — no crypto workflow required."
+        action={
+          <Button onClick={() => setNewTransferOpen(true)}>
+            <ArrowLeftRight className="h-4 w-4" /> New transfer
+          </Button>
+        }
       />
 
       {anchors.isError || sessions.isError ? (
@@ -210,6 +220,17 @@ export default function AnchorsPage() {
       ) : (
         <p className="text-sm text-ink/50">No anchor transfers yet.</p>
       )}
+      <AnchorInteractiveModal
+        sessionId={activeSessionId}
+        onClose={() => setActiveSessionId(null)}
+      />
+      <Sep24Modal
+        open={newTransferOpen}
+        onClose={() => setNewTransferOpen(false)}
+        onSessionStarted={() => {
+          void sessions.refetch();
+        }}
+      />
     </>
   );
 }
